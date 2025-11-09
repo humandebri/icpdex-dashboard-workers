@@ -1,0 +1,18 @@
+{
+  "name": "dex-workers",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cex-balance": "node cex_balance_checker/record_balances_and_prices.js",
+    "icpswap-monitor": "node icpswap_monitor/run_monitor.js"
+  },
+  "dependencies": {
+    "@dfinity/agent": "^2.4.1",
+    "@dfinity/candid": "^2.4.1",
+    "@supabase/supabase-js": "^2.80.0",
+    "ccxt": "^4.5.17",
+    "dotenv": "^17.2.3",
+    "node-fetch": "^3.3.2"
+  }
+}
