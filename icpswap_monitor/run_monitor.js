@@ -36,14 +36,22 @@ async function runOnce() {
   }
 
   isRunning = true;
+  const startedAt = Date.now();
+  console.log(
+    `[icpswap] runOnce start at ${new Date(startedAt).toISOString()} (pools=${icpswapMonitorConfig.pools.length})`
+  );
   try {
     const stats = [];
     for (const pool of icpswapMonitorConfig.pools) {
+      const poolStart = Date.now();
+      console.log(`[icpswap] start ${pool.title} at ${new Date(poolStart).toISOString()}`);
       try {
         const result = await syncPool(pool);
         stats.push(result);
         console.log(
-          `[icpswap] ${pool.title}: ${result.mode} sync inserted ${result.inserted} rows`
+          `[icpswap] ${pool.title}: ${result.mode} sync inserted ${result.inserted} rows (took ${
+            Date.now() - poolStart
+          }ms)`
         );
         await runPriceAlertCheck(pool);
         await runVolumeAlertCheck(pool);
@@ -68,13 +76,22 @@ async function runOnce() {
     // ここでthrowするとトップレベルまで伝播するのでログのみで継続する
   } finally {
     isRunning = false;
+    const duration = Date.now() - startedAt;
+    console.log(`[icpswap] runOnce finished in ${duration}ms`);
+    if (duration > icpswapMonitorConfig.pollIntervalMs) {
+      console.warn(
+        `[icpswap] runOnce exceeded poll interval: ${duration}ms > ${icpswapMonitorConfig.pollIntervalMs}ms`
+      );
+    }
   }
 }
 
 async function runOnceWithRetry(maxAttempts = 2, retryDelayMs = 5000) {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    console.log(`[icpswap] runOnce attempt ${attempt}/${maxAttempts}`);
     await runOnce();
     if (!isRunning) {
+      console.log('[icpswap] runOnce completed (isRunning cleared)');
       return;
     }
     if (attempt < maxAttempts) {
@@ -98,12 +115,16 @@ function startScheduler() {
 }
 
 if (process.argv[1] === __filename) {
-  try {
-    startScheduler();
-  } catch (error) {
-    console.error('[icpswap] fatal error during startup', error);
-    process.exit(1);
-  }
+  console.log('[icpswap] startScheduler triggered via direct execution');
+} else {
+  console.log('[icpswap] startScheduler triggered (imported run)');
+}
+
+try {
+  startScheduler();
+} catch (error) {
+  console.error('[icpswap] fatal error during startup', error);
+  process.exit(1);
 }
 
 // 価格アラート判定で例外が出ても全体ループを止めないよう握り潰す
