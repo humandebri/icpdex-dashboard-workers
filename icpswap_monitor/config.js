@@ -1,9 +1,24 @@
 // ファイル位置: icpswap_monitor/config.js
 // 目的: ICPSwapモニタリング処理の設定値とターゲットプール一覧を集中管理する
 // 背景: 環境変数を散在させるとデプロイトラブルに繋がるため、ここで一元読み込みする
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 
-dotenv.config();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+console.log('[config-file]', __filename);
+
+// 親 .env を固定パスで読み込む（cwd無関係・上書き許可）
+dotenv.config({ path: path.resolve(__dirname, '..', '.env'), override: true, debug: true });
+
+// 値を即チェック（空白除去・長さ出力）
+const rawUrl = process.env.SUPABASE_URL ?? '';
+const supabaseUrl = typeof rawUrl === 'string' ? rawUrl.trim() : '';
+console.log('[env-check] SUPABASE_URL(len)=', supabaseUrl.length, 'value=', JSON.stringify(supabaseUrl));
+
+// （必要なら）ローカル .env で上書きも許す場合のみ次行を有効化
+// dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const REQUIRED_ENV_VARS = ['SUPABASE_URL'];
 const missing = REQUIRED_ENV_VARS.filter((key) => !process.env[key]);
@@ -25,18 +40,16 @@ const pools = [
   { title: 'KINIC / ICP', poolId: '335nz-cyaaa-aaaag-qcdka-cai' },
   { title: 'MOTOKO / ICP', poolId: 'h2bmy-uaaaa-aaaag-qnffq-cai' },
   { title: 'ELNA / ICP', poolId: 'yonq6-5qaaa-aaaag-qdklq-cai' },
-  { title: 'DCD / ICP', poolId: 'tupjz-uyaaa-aaaag-qcjmq-cai' },
   { title: 'EXE / ICP', poolId: 'dlfvj-eqaaa-aaaag-qcs3a-cai' },
   { title: 'TAGGR / ICP', poolId: 'opl73-raaaa-aaaag-qcunq-cai' },
   { title: 'WTN / ICP', poolId: 'oqn67-kaaaa-aaaag-qj72q-cai' },
   { title: 'ICP / USDC', poolId: 'mohjv-bqaaa-aaaag-qjyia-cai' },
   { title: 'Querio / ICP', poolId: '7flwa-kaaaa-aaaag-qcxhq-cai' },
-  { title: 'ckETH / ICP', poolId: 'angxa-baaaa-aaaag-qcvnq-cai' },
   { title: 'ckBTC / ICP', poolId: 'xmiu5-jqaaa-aaaag-qbz7q-cai' },
 ];
 
 export const icpswapMonitorConfig = {
-  supabaseUrl: process.env.SUPABASE_URL,
+  supabaseUrl,
   supabaseKey,
   apiBaseUrl: process.env.ICPSWAP_API_BASE_URL ?? 'https://api.icpswap.com',
   pollIntervalMs: Number(process.env.ICPSWAP_POLL_INTERVAL_MS ?? 60000),
