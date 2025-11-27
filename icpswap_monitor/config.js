@@ -26,13 +26,18 @@ if (missing.length > 0) {
   throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
 }
 
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-const supabaseKey = supabaseServiceKey ?? supabaseAnonKey;
+const supabaseServiceKey = (process.env.SUPABASE_SERVICE_KEY ?? '').trim();
+const supabaseAnonKey = (process.env.SUPABASE_ANON_KEY ?? '').trim();
+const supabaseKey = supabaseServiceKey.length > 0 ? supabaseServiceKey : supabaseAnonKey.length > 0 ? supabaseAnonKey : null;
 
 if (!supabaseKey) {
+  console.error('[config-error] Supabase credentials missing: set SUPABASE_SERVICE_KEY or SUPABASE_ANON_KEY');
   throw new Error('Supabase credentials missing: SUPABASE_SERVICE_KEY か SUPABASE_ANON_KEY のいずれかを設定してください');
 }
+
+// デバッグ用にキー種別と長さのみ出力（値は表示しない）
+const supabaseKeySource = supabaseServiceKey.length > 0 ? 'service' : supabaseAnonKey.length > 0 ? 'anon' : 'none';
+console.log('[env-check] supabase key source=', supabaseKeySource, 'len=', supabaseKey?.length ?? 0);
 
 const pools = [
   { title: 'BOB / ICP', poolId: 'ybilh-nqaaa-aaaag-qkhzq-cai' },
@@ -52,7 +57,7 @@ export const icpswapMonitorConfig = {
   supabaseUrl,
   supabaseKey,
   apiBaseUrl: process.env.ICPSWAP_API_BASE_URL ?? 'https://api.icpswap.com',
-  pollIntervalMs: Number(process.env.ICPSWAP_POLL_INTERVAL_MS ?? 60000),
+  pollIntervalMs: 60000,
   requestTimeoutMs: Number(process.env.ICPSWAP_REQUEST_TIMEOUT_MS ?? 15000),
   supabaseRequestTimeoutMs: Number(process.env.ICPSWAP_SUPABASE_TIMEOUT_MS ?? 20000),
   notifierRequestTimeoutMs: Number(process.env.ICPSWAP_NOTIFIER_TIMEOUT_MS ?? 15000),
@@ -84,3 +89,12 @@ export const icpswapMonitorConfig = {
   },
   pools,
 };
+
+console.log(
+  '[env-check] pollIntervalMs=',
+  icpswapMonitorConfig.pollIntervalMs,
+  'requestTimeoutMs=',
+  icpswapMonitorConfig.requestTimeoutMs,
+  'supabaseRequestTimeoutMs=',
+  icpswapMonitorConfig.supabaseRequestTimeoutMs
+);

@@ -20,6 +20,15 @@ process.on('unhandledRejection', (reason) => {
   isRunning = false;
 });
 
+process.on('uncaughtException', (error) => {
+  console.error('[icpswap] uncaught exception', error);
+  // すぐ落ちるよりも状態を見たいので、ここでは終了せずPM2側に任せる
+});
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function runOnce() {
   if (isRunning) {
     console.warn('[icpswap] previous run still in progress, skipping this interval');
@@ -56,27 +65,45 @@ async function runOnce() {
     } catch (notifyError) {
       console.error('[icpswap] notify failed (runOnce error path)', notifyError);
     }
-    throw error;
+    // ここでthrowするとトップレベルまで伝播するのでログのみで継続する
   } finally {
     isRunning = false;
   }
 }
 
+async function runOnceWithRetry(maxAttempts = 2, retryDelayMs = 5000) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    await runOnce();
+    if (!isRunning) {
+      return;
+    }
+    if (attempt < maxAttempts) {
+      console.warn(`[icpswap] run still marked running, retrying in ${retryDelayMs}ms (attempt ${attempt}/${maxAttempts})`);
+      await delay(retryDelayMs);
+    }
+  }
+}
+
 function startScheduler() {
   console.log('[icpswap] monitor started in', __dirname);
-  runOnce().catch((error) => {
+  runOnceWithRetry().catch((error) => {
     console.error('[icpswap] initial run failed', error);
   });
 
   setInterval(() => {
-    runOnce().catch((error) => {
+    runOnceWithRetry().catch((error) => {
       console.error('[icpswap] scheduled run failed', error);
     });
   }, icpswapMonitorConfig.pollIntervalMs);
 }
 
 if (process.argv[1] === __filename) {
-  startScheduler();
+  try {
+    startScheduler();
+  } catch (error) {
+    console.error('[icpswap] fatal error during startup', error);
+    process.exit(1);
+  }
 }
 
 // 価格アラート判定で例外が出ても全体ループを止めないよう握り潰す
