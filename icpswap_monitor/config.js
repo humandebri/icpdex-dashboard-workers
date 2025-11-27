@@ -41,6 +41,8 @@ export const icpswapMonitorConfig = {
   apiBaseUrl: process.env.ICPSWAP_API_BASE_URL ?? 'https://api.icpswap.com',
   pollIntervalMs: Number(process.env.ICPSWAP_POLL_INTERVAL_MS ?? 60000),
   requestTimeoutMs: Number(process.env.ICPSWAP_REQUEST_TIMEOUT_MS ?? 15000),
+  supabaseRequestTimeoutMs: Number(process.env.ICPSWAP_SUPABASE_TIMEOUT_MS ?? 20000),
+  notifierRequestTimeoutMs: Number(process.env.ICPSWAP_NOTIFIER_TIMEOUT_MS ?? 15000),
   initialSync: {
     pageLimit: Number(process.env.ICPSWAP_INITIAL_PAGE_LIMIT ?? 300),
     maxPages: Number(process.env.ICPSWAP_INITIAL_MAX_PAGES ?? 20),

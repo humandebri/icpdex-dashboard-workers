@@ -23,6 +23,9 @@ export const appConfig = {
   supabaseKeyType: supabaseServiceKey ? 'service' : 'anon',
   ledgerHost: process.env.LEDGER_HOST ?? 'https://icp-api.io',
   snapshotIntervalMs: Number(process.env.SNAPSHOT_INTERVAL_MS ?? 300000),
+  ledgerRequestTimeoutMs: Number(process.env.LEDGER_TIMEOUT_MS ?? 20000),
+  priceRequestTimeoutMs: Number(process.env.PRICE_TIMEOUT_MS ?? 20000),
+  supabaseRequestTimeoutMs: Number(process.env.SUPABASE_TIMEOUT_MS ?? 20000),
   priceSymbols: {
     binance: process.env.PRICE_SYMBOL_BINANCE ?? 'ICP/USDT',
     coinbase: process.env.PRICE_SYMBOL_COINBASE ?? 'ICP/USD',

@@ -2,6 +2,36 @@
 // 目的: 価格計算やフォーマットなどロジックに依存しないヘルパー群
 // 背景: Processor や Charting から重複実装を排除し、テスト容易性を高める
 
+// 外部I/Oがハングした際に呼び出し元へ明示的に失敗を返すためのタイムアウトラッパー
+// cleanupFnはタイムアウト時に中断処理（例: AbortController.abort）を行うための任意のコールバック
+export function withTimeout(promise, ms, label = 'operation', cleanupFn) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(
+      () => {
+        if (cleanupFn) {
+          try {
+            cleanupFn();
+          } catch (cleanupError) {
+            // cleanup失敗はログのみ（呼び出し元で捕捉されるrejectを優先）
+            console.error(`cleanup failed for ${label}:`, cleanupError);
+          }
+        }
+        reject(new Error(`${label} timed out after ${ms}ms`));
+      },
+      ms
+    );
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
 export function decimalToNumber(value) {
   if (value === null || value === undefined || value === '') {
     return null;

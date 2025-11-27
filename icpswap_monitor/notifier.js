@@ -4,6 +4,7 @@
 import fetch from 'node-fetch';
 
 import { icpswapMonitorConfig } from './config.js';
+import { withTimeout } from './utils.js';
 
 const { discordWebhookUrl } = icpswapMonitorConfig.notifier;
 
@@ -12,13 +13,21 @@ export async function notify(message) {
     return;
   }
 
-  const response = await fetch(discordWebhookUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ content: message }),
-  });
+  const controller = new AbortController();
+
+  const response = await withTimeout(
+    fetch(discordWebhookUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      signal: controller.signal,
+      body: JSON.stringify({ content: message }),
+    }),
+    icpswapMonitorConfig.notifierRequestTimeoutMs,
+    'discord webhook',
+    () => controller.abort()
+  );
 
   if (!response.ok) {
     const body = await response.text();

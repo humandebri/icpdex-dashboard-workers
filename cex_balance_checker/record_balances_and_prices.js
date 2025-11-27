@@ -35,12 +35,39 @@ const ledgerActor = Actor.createActor(ledgerIdlFactory, {
   canisterId: LEDGER_CANISTER_ID,
 });
 
+let isRunning = false;
+
+// 外部I/Oのハングを検知して処理ロックを解除するためのタイムアウトラッパー
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms);
+    promise
+      .then((value) => {
+        clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+  });
+}
+
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason);
+  isRunning = false;
+});
+
 async function fetchBalance(ledger, account) {
   const { name, accountHex } = account;
   try {
-    const result = await ledger.account_balance({
-      account: Array.from(hexToBytes(accountHex)),
-    });
+    const result = await withTimeout(
+      ledger.account_balance({
+        account: Array.from(hexToBytes(accountHex)),
+      }),
+      appConfig.ledgerRequestTimeoutMs,
+      `ledger account_balance for ${name}`
+    );
     const balanceICP = Number(result.e8s) / 1e8;
     return { ...account, balanceICP, balanceError: null };
   } catch (error) {
@@ -56,7 +83,11 @@ async function fetchPrice(source) {
   }
 
   try {
-    const ticker = await client.fetchTicker(symbol);
+    const ticker = await withTimeout(
+      client.fetchTicker(symbol),
+      appConfig.priceRequestTimeoutMs,
+      `fetchTicker for ${source}`
+    );
     const lastPrice = ticker.last ?? ticker.close ?? null;
     if (lastPrice === null) {
       return { price: null, priceError: `Ticker missing price for ${source}`, symbol };
@@ -85,11 +116,15 @@ function buildSnapshotPayload(balanceResults) {
 
 async function persistSnapshot(balanceResults, priceResults) {
   const { hadError, totalICP } = buildSnapshotPayload(balanceResults);
-  const { data: snapshot, error: snapshotError } = await supabase
-    .from('balance_snapshots')
-    .insert([{ total_icp: totalICP, had_error: hadError }])
-    .select()
-    .single();
+  const { data: snapshot, error: snapshotError } = await withTimeout(
+    supabase
+      .from('balance_snapshots')
+      .insert([{ total_icp: totalICP, had_error: hadError }])
+      .select()
+      .single(),
+    appConfig.supabaseRequestTimeoutMs,
+    'insert balance_snapshots'
+  );
 
   if (snapshotError) {
     throw new Error(`Failed to insert snapshot: ${snapshotError.message}`);
@@ -112,9 +147,11 @@ async function persistSnapshot(balanceResults, priceResults) {
     }
   );
 
-  const { error: entriesError } = await supabase
-    .from('balance_snapshot_entries')
-    .insert(entriesPayload);
+  const { error: entriesError } = await withTimeout(
+    supabase.from('balance_snapshot_entries').insert(entriesPayload),
+    appConfig.supabaseRequestTimeoutMs,
+    'insert balance_snapshot_entries'
+  );
 
   if (entriesError) {
     throw new Error(`Failed to insert snapshot entries: ${entriesError.message}`);
@@ -134,8 +171,6 @@ async function captureSnapshot() {
     )})`
   );
 }
-
-let isRunning = false;
 
 async function runScheduledSnapshot() {
   if (isRunning) {

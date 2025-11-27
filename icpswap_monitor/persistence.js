@@ -4,18 +4,23 @@
 import { createClient } from '@supabase/supabase-js';
 
 import { icpswapMonitorConfig } from './config.js';
+import { withTimeout } from './utils.js';
 
 const supabase = createClient(icpswapMonitorConfig.supabaseUrl, icpswapMonitorConfig.supabaseKey);
 const TABLE = 'icpswap_pool_transactions';
 
 export async function getLatestStoredTransaction(poolId) {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('tx_hash, tx_time')
-    .eq('pool_id', poolId)
-    .order('tx_time', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data, error } = await withTimeout(
+    supabase
+      .from(TABLE)
+      .select('tx_hash, tx_time')
+      .eq('pool_id', poolId)
+      .order('tx_time', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    icpswapMonitorConfig.supabaseRequestTimeoutMs,
+    `fetch latest transaction for ${poolId}`
+  );
 
   if (error && error.code !== 'PGRST116') {
     throw new Error(`Failed to load latest transaction for ${poolId}: ${error.message}`);
@@ -31,9 +36,11 @@ export async function upsertTransactions(records) {
 
   const deduped = dedupeBy(records, (record) => record.tx_hash);
 
-  const { error } = await supabase
-    .from(TABLE)
-    .upsert(deduped, { onConflict: 'tx_hash' });
+  const { error } = await withTimeout(
+    supabase.from(TABLE).upsert(deduped, { onConflict: 'tx_hash' }),
+    icpswapMonitorConfig.supabaseRequestTimeoutMs,
+    `upsert transactions for ${records[0].pool_id}`
+  );
 
   if (error) {
     throw new Error(`Failed to upsert transactions: ${error.message}`);
@@ -43,12 +50,16 @@ export async function upsertTransactions(records) {
 }
 
 export async function fetchTransactionsSince(poolId, sinceIso) {
-  const { data, error } = await supabase
-    .from(TABLE)
-    .select('*')
-    .eq('pool_id', poolId)
-    .gte('tx_time', sinceIso)
-    .order('tx_time', { ascending: true });
+  const { data, error } = await withTimeout(
+    supabase
+      .from(TABLE)
+      .select('*')
+      .eq('pool_id', poolId)
+      .gte('tx_time', sinceIso)
+      .order('tx_time', { ascending: true }),
+    icpswapMonitorConfig.supabaseRequestTimeoutMs,
+    `fetch transactions since ${sinceIso} for ${poolId}`
+  );
 
   if (error) {
     throw new Error(`Failed to fetch transactions for ${poolId}: ${error.message}`);

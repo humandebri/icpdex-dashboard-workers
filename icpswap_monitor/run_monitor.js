@@ -15,6 +15,11 @@ const __dirname = dirname(__filename);
 
 let isRunning = false;
 
+process.on('unhandledRejection', (reason) => {
+  console.error('[icpswap] unhandled promise rejection', reason);
+  isRunning = false;
+});
+
 async function runOnce() {
   if (isRunning) {
     console.warn('[icpswap] previous run still in progress, skipping this interval');
@@ -35,14 +40,22 @@ async function runOnce() {
         await runVolumeAlertCheck(pool);
       } catch (poolError) {
         console.error(`[icpswap] Failed to sync ${pool.title}:`, poolError);
-        await notify(`ICPSwapモニタ同期失敗: ${pool.title} - ${poolError.message}`);
+        try {
+          await notify(`ICPSwapモニタ同期失敗: ${pool.title} - ${poolError.message}`);
+        } catch (notifyError) {
+          console.error('[icpswap] notify failed (pool error path)', notifyError);
+        }
       }
     }
 
     return stats;
   } catch (error) {
     console.error('[icpswap] runOnce failed', error);
-    await notify(`ICPSwapモニタが停止しました: ${error.message}`);
+    try {
+      await notify(`ICPSwapモニタが停止しました: ${error.message}`);
+    } catch (notifyError) {
+      console.error('[icpswap] notify failed (runOnce error path)', notifyError);
+    }
     throw error;
   } finally {
     isRunning = false;
