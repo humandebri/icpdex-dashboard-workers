@@ -93,12 +93,16 @@ function startScheduler() {
   }, icpswapMonitorConfig.pollIntervalMs);
 }
 
-export function isDirectExecution(entryFilePath = process.argv[1]) {
-  return entryFilePath === __filename;
+export function shouldStartScheduler({
+  entryFilePath = process.argv[1],
+  pmId = process.env.pm_id,
+  pm2Home = process.env.PM2_HOME,
+} = {}) {
+  return entryFilePath === __filename || pmId !== undefined || Boolean(pm2Home);
 }
 
-if (isDirectExecution()) {
-  console.log('[icpswap] startScheduler triggered via direct execution');
+if (shouldStartScheduler()) {
+  console.log('[icpswap] startScheduler triggered via execution context');
   try {
     startScheduler();
   } catch (error) {
