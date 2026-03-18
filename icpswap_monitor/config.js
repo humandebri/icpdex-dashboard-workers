@@ -10,12 +10,12 @@ const __dirname = path.dirname(__filename);
 console.log('[config-file]', __filename);
 
 // 親 .env を固定パスで読み込む（cwd無関係・上書き許可）
-dotenv.config({ path: path.resolve(__dirname, '..', '.env'), override: true, debug: true });
+dotenv.config({ path: path.resolve(__dirname, '..', '.env'), override: true });
 
-// 値を即チェック（空白除去・長さ出力）
+// 値を即チェックし、ログは秘匿情報の露出を避けて長さだけ残す
 const rawUrl = process.env.SUPABASE_URL ?? '';
 const supabaseUrl = typeof rawUrl === 'string' ? rawUrl.trim() : '';
-console.log('[env-check] SUPABASE_URL(len)=', supabaseUrl.length, 'value=', JSON.stringify(supabaseUrl));
+console.log('[env-check] SUPABASE_URL(len)=', supabaseUrl.length);
 
 // （必要なら）ローカル .env で上書きも許す場合のみ次行を有効化
 // dotenv.config({ path: path.resolve(__dirname, '.env') });
@@ -75,14 +75,6 @@ export const icpswapMonitorConfig = {
     windowMinutes: Number(process.env.ICPSWAP_PRICE_ALERT_WINDOW_MINUTES ?? 60),
     minSamples: Number(process.env.ICPSWAP_PRICE_ALERT_MIN_SAMPLES ?? 2),
     cooldownMinutes: Number(process.env.ICPSWAP_PRICE_ALERT_COOLDOWN_MINUTES ?? 10),
-  },
-  volumeAlert: {
-    enabled: process.env.ICPSWAP_VOLUME_ALERT_ENABLED !== 'false',
-    windowMinutes: Number(process.env.ICPSWAP_VOLUME_ALERT_WINDOW_MINUTES ?? 60),
-    baselineHours: Number(process.env.ICPSWAP_VOLUME_ALERT_BASELINE_HOURS ?? 24),
-    increasePercent: Number(process.env.ICPSWAP_VOLUME_ALERT_INCREASE_PERCENT ?? 100),
-    minBaselineVolume: Number(process.env.ICPSWAP_VOLUME_ALERT_MIN_BASELINE ?? 0),
-    cooldownMinutes: Number(process.env.ICPSWAP_VOLUME_ALERT_COOLDOWN_MINUTES ?? 30),
   },
   notifier: {
     discordWebhookUrl: process.env.NOTIFY_DISCORD_WEBHOOK_URL ?? null,

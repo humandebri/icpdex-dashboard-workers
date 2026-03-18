@@ -57,15 +57,35 @@ export async function checkPriceAlert(pool) {
   const rangeLabel = `${formatTimestampLabel(new Date(first.tx_time))} → ${formatTimestampLabel(
     new Date(latest.tx_time)
   )}`;
-  const message = [
-    'ICPSwap価格アラート',
-    `${pool.title}: ${direction} ${changePercent.toFixed(1)}%`,
-    `価格 ${formatPrice(displayBasePrice)} → ${formatPrice(displayCurrentPrice)}`,
-    `期間 ${rangeLabel} (過去${alertConfig.windowMinutes}分)`,
-  ].join('\\n');
+  const message = buildPriceAlertMessage({
+    title: pool.title,
+    direction,
+    changePercent,
+    displayBasePrice,
+    displayCurrentPrice,
+    rangeLabel,
+    windowMinutes: alertConfig.windowMinutes,
+  });
 
   await notify(message);
   lastAlertAt.set(pool.poolId, now);
+}
+
+export function buildPriceAlertMessage({
+  title,
+  direction,
+  changePercent,
+  displayBasePrice,
+  displayCurrentPrice,
+  rangeLabel,
+  windowMinutes,
+}) {
+  return [
+    'ICPSwap価格アラート',
+    `${title}: ${direction} ${changePercent.toFixed(1)}%`,
+    `価格 ${formatPrice(displayBasePrice)} → ${formatPrice(displayCurrentPrice)}`,
+    `期間 ${rangeLabel} (過去${windowMinutes}分)`,
+  ].join('\n');
 }
 
 function isValidPrice(value) {

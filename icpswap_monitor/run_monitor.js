@@ -8,7 +8,6 @@ import { icpswapMonitorConfig } from './config.js';
 import { syncPool } from './processor.js';
 import { notify } from './notifier.js';
 import { checkPriceAlert } from './price_alert.js';
-import { checkVolumeAlert } from './volume_alert.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -24,10 +23,6 @@ process.on('uncaughtException', (error) => {
   console.error('[icpswap] uncaught exception', error);
   // すぐ落ちるよりも状態を見たいので、ここでは終了せずPM2側に任せる
 });
-
-function delay(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 async function runOnce() {
   if (isRunning) {
@@ -54,7 +49,6 @@ async function runOnce() {
           }ms)`
         );
         await runPriceAlertCheck(pool);
-        await runVolumeAlertCheck(pool);
       } catch (poolError) {
         console.error(`[icpswap] Failed to sync ${pool.title}:`, poolError);
         try {
@@ -86,45 +80,33 @@ async function runOnce() {
   }
 }
 
-async function runOnceWithRetry(maxAttempts = 2, retryDelayMs = 5000) {
-  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-    console.log(`[icpswap] runOnce attempt ${attempt}/${maxAttempts}`);
-    await runOnce();
-    if (!isRunning) {
-      console.log('[icpswap] runOnce completed (isRunning cleared)');
-      return;
-    }
-    if (attempt < maxAttempts) {
-      console.warn(`[icpswap] run still marked running, retrying in ${retryDelayMs}ms (attempt ${attempt}/${maxAttempts})`);
-      await delay(retryDelayMs);
-    }
-  }
-}
-
 function startScheduler() {
   console.log('[icpswap] monitor started in', __dirname);
-  runOnceWithRetry().catch((error) => {
+  runOnce().catch((error) => {
     console.error('[icpswap] initial run failed', error);
   });
 
   setInterval(() => {
-    runOnceWithRetry().catch((error) => {
+    runOnce().catch((error) => {
       console.error('[icpswap] scheduled run failed', error);
     });
   }, icpswapMonitorConfig.pollIntervalMs);
 }
 
-if (process.argv[1] === __filename) {
-  console.log('[icpswap] startScheduler triggered via direct execution');
-} else {
-  console.log('[icpswap] startScheduler triggered (imported run)');
+export function isDirectExecution(entryFilePath = process.argv[1]) {
+  return entryFilePath === __filename;
 }
 
-try {
-  startScheduler();
-} catch (error) {
-  console.error('[icpswap] fatal error during startup', error);
-  process.exit(1);
+if (isDirectExecution()) {
+  console.log('[icpswap] startScheduler triggered via direct execution');
+  try {
+    startScheduler();
+  } catch (error) {
+    console.error('[icpswap] fatal error during startup', error);
+    process.exit(1);
+  }
+} else {
+  console.log('[icpswap] module loaded without starting scheduler');
 }
 
 // 価格アラート判定で例外が出ても全体ループを止めないよう握り潰す
@@ -133,15 +115,6 @@ async function runPriceAlertCheck(pool) {
     await checkPriceAlert(pool);
   } catch (error) {
     console.error(`[icpswap] price alert evaluation failed for ${pool.title}`, error);
-  }
-}
-
-// 出来高アラートも副次的な監視なので、失敗時はログのみ残す
-async function runVolumeAlertCheck(pool) {
-  try {
-    await checkVolumeAlert(pool);
-  } catch (error) {
-    console.error(`[icpswap] volume alert evaluation failed for ${pool.title}`, error);
   }
 }
 
